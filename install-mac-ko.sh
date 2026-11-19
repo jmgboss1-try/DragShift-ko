@@ -31,7 +31,7 @@ echo "→ 사용할 파이썬: $PY ($("$PY" --version))"
 echo "→ 최신 한글판 내려받는 중"
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/main" -o "$TMP/src.tar.gz"
 tar -xzf "$TMP/src.tar.gz" -C "$TMP"
-SRC="$(find "$TMP" -maxdepth 1 -type d -name 'dragshift-ko-*' | head -1)"
+SRC="$(find "$TMP" -maxdepth 1 -type d -iname 'dragshift-ko-*' | head -1)"
 [ -d "$SRC/dragshift" ] || { echo "✗ 내려받은 파일이 이상해요."; exit 1; }
 mkdir -p "$HOME_DIR"
 rm -rf "$HOME_DIR/app"
