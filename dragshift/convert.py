@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
     import fitz  # type: ignore
 
 IMAGE_TARGETS = ["PNG", "JPG", "WEBP", "HEIC", "TIFF", "AVIF", "BMP", "PDF", "ICO", "GIF"]
-PDF_TARGETS = ["JPG", "PNG", "DOCX", "TXT"]
+PDF_TARGETS = ["JPG", "PNG", "DOCX", "PPTX", "PPTX ✎", "TXT"]
 DOCX_TARGETS = ["PDF", "TXT"]
 TEXT_TARGETS = ["PDF", "DOCX"]
 
@@ -155,10 +155,158 @@ def pdf_to_images(src: str | Path, target: str, dpi: int | None = None) -> list[
 
 
 def pdf_to_txt(src: str | Path) -> list[Path]:
+    from . import ocr
     with open_pdf(src) as doc:
-        text = "\n\f\n".join(page.get_text("text") for page in doc)
+        parts = []
+        for page in doc:
+            if ocr.available() and ocr.page_is_scanned(page):
+                parts.append(ocr.lines_text(ocr.page_lines(page)))   # scanned page: read it
+            else:
+                parts.append(page.get_text("text"))
+        text = "\n\f\n".join(parts)
     out = sibling(src, ext=".txt")
     out.write_text(text, encoding="utf-8")
+    return [out]
+
+
+def _font_family(name: str) -> str:
+    name = name.split("+", 1)[-1]                      # drop subset prefix "ABCDEF+"
+    for suf in ("-BoldItalic", "-BoldOblique", "-Bold", "-Italic", "-Oblique", "-Regular", "-Medium",
+                "-Light", "-SemiBold", "-Semibold", "-Black", "-Heavy", "-Thin", "-ExtraBold", ",Bold"):
+        if name.endswith(suf):
+            return name[: -len(suf)]
+    return name
+
+
+def pdf_to_pptx(src: str | Path, editable: bool = False, dpi: int | None = None) -> list[Path]:
+    """One slide per page.
+
+    editable=False: the page as a full-slide picture, its text in the speaker notes.
+    editable=True:  the page without its text as the background picture, and the text laid back on
+                    top as editable text boxes in the same places (fonts may be substituted).
+    """
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import MSO_AUTO_SIZE
+    from pptx.util import Emu, Pt
+    from . import ocr
+    from .util import CONFIG
+    dpi = dpi or int(CONFIG.get("pdf_dpi", 200))
+    EMU_PER_PT = 12700
+    MAX, MIN = 51206400, 914400          # PowerPoint's slide size limits (56 in / 1 in)
+    prs = Presentation()
+    with open_pdf(src) as doc:
+        if doc.page_count == 0:
+            raise UserError("This PDF has no pages.")
+        r0 = doc[0].rect
+        w, h = r0.width * EMU_PER_PT, r0.height * EMU_PER_PT
+        k = min(1.0, MAX / max(w, h))
+        if min(w * k, h * k) < MIN:
+            k = MIN / min(w, h)
+        prs.slide_width, prs.slide_height = Emu(int(w * k)), Emu(int(h * k))
+        sw, sh = prs.slide_width, prs.slide_height
+        blank = prs.slide_layouts[6]
+        for pno, page in enumerate(doc):
+            # fit (letterbox) pages whose shape differs from the first one
+            pr = page.rect.width / page.rect.height
+            if pr >= sw / sh:
+                pw, ph = sw, int(sw / pr)
+            else:
+                pw, ph = int(sh * pr), sh
+            ox, oy = (sw - pw) // 2, (sh - ph) // 2
+            s = pw / page.rect.width                     # EMU per PDF point on this slide
+            slide = prs.slides.add_slide(blank)
+            blocks = []
+            render = page
+            tmp = None
+            scanned_lines = None
+            if editable and ocr.available() and ocr.page_is_scanned(page):
+                page_im = ocr.page_image(page)
+                scanned_lines = [ln for ln, _ in ocr.page_lines(page, page_im)]
+            elif editable:
+                info = page.get_text("dict", flags=fitz.TEXTFLAGS_TEXT)
+                tmp = fitz.open()
+                tmp.insert_pdf(doc, from_page=pno, to_page=pno)
+                bp = tmp[0]
+                for b in info["blocks"]:
+                    if b.get("type") != 0:
+                        continue
+                    lines = [ln for ln in b["lines"] if abs(ln["dir"][1]) < 0.05 and
+                             "".join(sp["text"] for sp in ln["spans"]).strip()]
+                    if not lines:
+                        continue
+                    for ln in lines:
+                        bp.add_redact_annot(fitz.Rect(ln["bbox"]), fill=False)
+                    blocks.append(lines)
+                bp.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE,
+                                    graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+                                    text=fitz.PDF_REDACT_TEXT_REMOVE)
+                render = bp
+            pix = render.get_pixmap(dpi=dpi, alpha=False)
+            slide.shapes.add_picture(io.BytesIO(pix.tobytes("png")), Emu(ox), Emu(oy), Emu(pw), Emu(ph))
+            if tmp is not None:
+                tmp.close()
+            for ln in scanned_lines or []:
+                # scanned page: cover the printed words with their background colour, type them on top
+                W, H = page_im.size
+                pad = (ln.y1 - ln.y0) * 0.12
+                bg, fg = ocr.colours(page_im, ((ln.x0 - pad / 3) * W, (ln.y0 - pad) * H,
+                                               (ln.x1 + pad / 3) * W, (ln.y1 + pad) * H))
+                left, top = ox + (ln.x0 - pad / 3) * pw, oy + (ln.y0 - pad) * ph
+                tb = slide.shapes.add_textbox(Emu(int(left)), Emu(int(top)),
+                                              Emu(max(1, int((ln.x1 - ln.x0 + pad * 2 / 3) * pw))),
+                                              Emu(max(1, int((ln.y1 - ln.y0 + pad * 2) * ph))))
+                tb.fill.solid()
+                tb.fill.fore_color.rgb = RGBColor(*bg)
+                tf = tb.text_frame
+                tf.word_wrap = False
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+                tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+                run = tf.paragraphs[0].add_run()
+                run.text = ln.text
+                run.font.size = Pt(max(1, round((ln.y1 - ln.y0) * ph * 0.95 / EMU_PER_PT, 1)))
+                run.font.color.rgb = RGBColor(*fg)
+            if scanned_lines is not None:
+                text = "\n".join(ln.text for ln in scanned_lines)
+                if text:
+                    slide.notes_slide.notes_text_frame.text = text
+                continue
+            for lines in blocks:
+                x0 = min(ln["bbox"][0] for ln in lines) - page.rect.x0
+                y0 = min(ln["bbox"][1] for ln in lines) - page.rect.y0
+                x1 = max(ln["bbox"][2] for ln in lines) - page.rect.x0
+                y1 = max(ln["bbox"][3] for ln in lines) - page.rect.y0
+                tb = slide.shapes.add_textbox(Emu(int(ox + x0 * s)), Emu(int(oy + y0 * s)),
+                                              Emu(max(1, int((x1 - x0) * s * 1.04))), Emu(max(1, int((y1 - y0) * s))))
+                tf = tb.text_frame
+                tf.word_wrap = False
+                tf.auto_size = MSO_AUTO_SIZE.NONE
+                tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+                pitch = ((lines[-1]["bbox"][1] - lines[0]["bbox"][1]) / (len(lines) - 1)) if len(lines) > 1 else None
+                for i, ln in enumerate(lines):
+                    para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+                    para.space_before = para.space_after = Pt(0)
+                    if pitch:
+                        para.line_spacing = Pt(max(1, pitch * s / EMU_PER_PT))
+                    for sp in ln["spans"]:
+                        if not sp["text"]:
+                            continue
+                        run = para.add_run()
+                        run.text = sp["text"].replace("\xa0", " ")
+                        f = run.font
+                        f.size = Pt(max(1, round(sp["size"] * s / EMU_PER_PT, 1)))
+                        f.bold = bool(sp["flags"] & 16) or "Bold" in sp["font"]
+                        f.italic = bool(sp["flags"] & 2)
+                        c = sp.get("color", 0)
+                        f.color.rgb = RGBColor((c >> 16) & 255, (c >> 8) & 255, c & 255)
+                        fam = _font_family(sp["font"])
+                        if fam:
+                            f.name = fam
+            text = page.get_text("text").strip()
+            if text:
+                slide.notes_slide.notes_text_frame.text = text
+    out = sibling(src, "editable" if editable else "", ext=".pptx")
+    prs.save(str(out))
     return [out]
 
 
@@ -376,6 +524,10 @@ def convert(src: str | Path, cat: str, target: str) -> list[Path]:
             return pdf_to_txt(src)
         if target == "DOCX":
             return pdf_to_docx(src)
+        if target == "PPTX":
+            return pdf_to_pptx(src)
+        if target == "PPTX ✎":
+            return pdf_to_pptx(src, editable=True)
     if cat == "docx":
         return docx_to_pdf(src) if target == "PDF" else docx_to_txt(src)
     if cat == "text":

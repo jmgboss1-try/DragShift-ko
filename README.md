@@ -1,108 +1,40 @@
-# DragShift
+# DragShift 한글판
 
-Convert and edit files on **Windows, Mac and Linux** with a liquid-glass radial menu. Start dragging any file, press **Shift**, and drop it on a slice.
+[DragShift](https://github.com/llamaboi55/DragShift)를 한국어로 쓰기 위해 고친 버전이에요.
+파일을 **끌다가 Shift를 누르면** 커서 아래에 원형 메뉴가 열리고, 원하는 칸에 놓으면 변환·편집된 파일이 원본 옆에 저장돼요. 원본 파일은 바뀌지 않아요.
 
-![DragShift radial menu and Add BG editor](docs/preview.png)
+![미리보기](docs/preview.png)
 
-## Download
+## 원본과 달라진 점
 
-From the [latest release](../../releases/latest):
+- **한국어 화면** — 메뉴, 설정, 편집 창, 알림을 모두 한글로 표시해요 (`dragshift/ko.py`). 원본 코드는 거의 그대로 두고 화면에 그려지는 글자만 바꾸는 방식이라, 원본 업데이트를 합치기 쉬워요.
+- **PDF → PPTX** — 변환 메뉴에 두 가지가 추가됐어요.
+  - `PPTX` 모양 그대로: 페이지를 그림으로, 글자는 발표자 노트에.
+  - `PPTX ✎` 글자 수정 가능: 배경은 그림으로, 글자는 원래 자리에 편집 가능한 텍스트 상자로.
+- **글자 인식(OCR)** — 스캔한 PDF·사진의 글자를 읽어요 (`dragshift/ocr.py`). 인터넷 없이 컴퓨터 안에서만 처리해요.
+  - 도구 메뉴 → `⌕ 글자 인식`: 검색·복사되는 PDF + TXT
+  - 스캔본을 `TXT`나 `PPTX ✎`로 변환해도 자동으로 글자를 인식해요.
+  - 맥: Apple Vision (macOS 13 이상에서 한국어) · 윈도우: Windows OCR (한국어 언어팩 필요)
 
-- **DragShift-Setup.exe** (recommended): installs for your user only, so no admin rights are needed. It adds a Start menu entry, an option to start with Windows, a right-click **DragShift…** entry and a **Send to → DragShift** entry. It uninstalls cleanly from Settings → Apps.
-- **DragShift.exe**: a portable version you can run from anywhere.
+## 설치
 
-**Mac (easiest, no security warning):** paste this into Terminal:
+### 윈도우
+[Releases](https://github.com/jmgboss1-try/dragshift-ko/releases/latest)에서 **DragShift-Setup.exe**를 받아 실행하세요. 관리자 권한은 필요 없어요.
+- "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행** (서명되지 않은 프로그램이라 뜨는 경고)
+- 한국어 글자 인식: **설정 → 시간 및 언어 → 언어 및 지역**에 **한국어** 추가
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/llamaboi55/DragShift/main/install-mac.sh | bash
-```
+### 맥
+1. [python.org](https://www.python.org/downloads/macos/)에서 **Python 3.13**을 설치하고, 설치 후 열리는 폴더의 `Install Certificates.command`를 실행하세요.
+2. 터미널에 붙여넣기:
+   ```
+   curl -fsSL https://raw.githubusercontent.com/jmgboss1-try/dragshift-ko/main/install-mac-ko.sh | bash
+   ```
+3. `~/Applications/DragShift 한글.app`이 만들어지고 메뉴 막대에 아이콘이 생겨요. 같은 명령을 다시 실행하면 최신 버전으로 업데이트돼요.
 
-It picks the right build for your Mac, installs it to Applications and opens it ([see what it does](install-mac.sh)). Run the same line again to update.
+## 원본 업데이트 합치기
 
-Or download the .dmg yourself:
-- **DragShift-mac-apple-silicon.dmg**: for Macs with M1, M2, M3 or M4 chips (macOS 11 or later).
-- **DragShift-mac-intel.dmg**: for Intel Macs.
+GitHub에서 **Sync fork** 버튼을 누르면 원본(llamaboi55/DragShift)의 변경 사항을 가져와요. 새로 생긴 영어 문구는 `dragshift/ko.py`의 `EXACT`/`RULES`에 번역을 추가하면 돼요.
 
-Open the .dmg and drag **DragShift** into Applications. DragShift lives in the menu bar and has no Dock icon. You can also right-click any file → **Open With → DragShift**.
+## 라이선스
 
-**Linux (Debian, Ubuntu, Mint, MX… with XFCE, MATE, Cinnamon or any X11 desktop):** download **DragShift-linux-amd64.deb**, then run:
-
-```bash
-sudo apt install ./DragShift-linux-amd64.deb
-```
-
-Open **DragShift** from the app menu. It sits in the panel's notification area, and you can turn on *Start at login* in Settings. It works in Thunar, Nautilus, Nemo, Caja, Dolphin and on the desktop, and it also adds **Open With → DragShift** to file right-click menus. It works with or without a compositor: when compositing is off (common on XFCE), the menu and windows are cut to their exact shape, so you won't see black boxes. Builds target Debian 12 or newer (Ubuntu 23.04+).
-
-> **Wayland:** Wayland doesn't let apps read the global Shift and mouse state, so the Shift + drag trigger only works in X11 sessions (XFCE is X11). On GNOME/KDE Wayland, use right-click → **Open With → DragShift**, or pick *"Ubuntu on Xorg"* / *"Plasma (X11)"* at the login screen.
-
-> **First launch on Windows:** SmartScreen may warn because the app isn't code-signed yet. Click **More info → Run anyway**.
->
-> **First launch on Mac, if you used the .dmg instead of the Terminal line:** macOS says *"Apple could not verify 'DragShift' is free of malware."* This happens with any app that hasn't paid for Apple's notarization; DragShift's code is all public in this repo. To open it:
-> 1. Open DragShift once and click **Done** on the warning.
-> 2. Go to  → **System Settings → Privacy & Security**, scroll down to *"DragShift was blocked…"* and click **Open Anyway**. Enter your password and confirm.
-> 3. That's it. macOS remembers the choice.
->
-> Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/DragShift.app`
-> (On macOS 15 and later, the old right-click → Open shortcut no longer skips this warning.)
->
-> **Mac, optional:** allow **Screen Recording** when DragShift asks, so the glass can refract the windows behind it. Without it, the glass shows your wallpaper. Nothing is ever saved or sent.
-
-## How to use
-
-1. Start dragging a file (an image, PDF, Word or text file; desktop shortcuts to one work too) in File Explorer, Finder, your Linux file manager or on the desktop.
-2. Press **Shift**. The menu opens under your cursor.
-3. Drop the file on a slice. The result is saved **next to the original**, and the original is never changed.
-4. To switch between **Convert** and **Tools**, tap **Shift** again.
-
-Each action ends with a notification that shows what changed, for example *"2.4 MB → 610 KB · 75% smaller"* or *"2400×1600 → 1200×800"*, with **Open**, **Show in folder** and **Undo**. Undo moves the new file to the Recycle Bin (Trash on Mac and Linux).
-
-You can also right-click a file → **DragShift…**, use **Send to → DragShift**, or double-click the tray icon to pick a file.
-
-## What it does
-
-| File | Convert to | Tools |
-|---|---|---|
-| Images (JPG, PNG, WEBP, HEIC, AVIF, TIFF, BMP, GIF, ICO) | Any of those, or PDF. Several images become one combined PDF | **Compress** (by quality or to a target size such as "under 500 KB", with a before/after preview, several files at once) · **Resize** · **Crop** (ratios, live pixel size, rotate) · **Edit** (Auto, light/colour, rotate, flip, B&W, hold to compare) · **Annotate** (arrows, boxes, numbered steps, text, marker) · **Redact** · **Add BG** · **Metadata** (camera, date, GPS location with a map link; remove location only or remove everything) |
-| PDF | JPG or PNG (one per page), DOCX, TXT | Compress · Split · Rotate · Merge (drop several) · **Protect** (AES-256 password) · **Extract images** · Metadata |
-| Word (.docx) | PDF (uses Microsoft Word if it's installed, otherwise a built-in renderer), TXT | — |
-| Text (.txt, .md, .csv…) | PDF, DOCX | — |
-
-**Settings** (tray menu): trigger key (Shift, Ctrl or Alt), where results go (next to the original or a `DragShift` subfolder), JPG/WebP quality, PDF → image resolution, and start at login.
-
-## The look
-
-The menu, notifications and windows use real **liquid-glass** rendering. DragShift captures the screen behind each surface and refracts it through the shape. A curved edge bends light, R, G and B bend by slightly different amounts (which gives the rainbow fringe), a highlight runs along the rim facing the light, and the tint adapts to what's behind it so text stays readable. The menu renders on a background thread while it pops in, so it still opens instantly.
-
-## Tested on real desktops
-
-Every push runs these jobs on GitHub's Windows, Mac and Linux machines:
-
-- **Build:** unit tests, the portable exe and installer builds, a self-test of each build, and a silent install → run → uninstall check.
-- **End-to-end:** a script moves the real mouse to drag files from File Explorer *and* the Desktop, presses Shift, drops on every conversion and tool, drives each tool window, and checks every output file (format, dimensions, page counts, encryption, metadata removed). The results table and a screen recording are saved to the `e2e-output` branch.
-- **Mac end-to-end:** real Finder drags with Shift (Quartz mouse and keyboard events) through conversions, PDF tools, merging and the tool windows. Every output is checked, and the run is recorded to the `e2e-mac-output` branch.
-- **Mac builds:** `DragShift.app` and the .dmg for Apple Silicon and Intel, each self-tested inside the app bundle.
-- **Debian/XFCE:** builds the .deb on Debian 12, installs it, and runs the same kind of end-to-end test in Thunar under XFCE's window manager with the compositor **off**. Real XTest drags with Shift go through conversions, PDF tools, merging, the tool windows and Open With. The results and a recording are saved to the `e2e-linux-output` branch.
-- **Demo video:** pushing to the `demo` branch records a showcase video.
-
-## Support
-
-DragShift is free. If it saves you time, you can leave a tip on Cash App: [**$AtikaKadesha**](https://cash.app/$AtikaKadesha). Thank you!
-
-<img src="docs/tip-cashapp.png" alt="Cash App QR code for $AtikaKadesha" width="220">
-
-## License
-
-[MIT](LICENSE): free to use, modify and share.
-
-## Run from source
-
-```bash
-pip install -r requirements.txt
-python -m dragshift
-```
-
-On Linux, PySide6 also needs the Qt XCB libraries: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0`.
-
-Tests: `python -m pytest -q`. Logs are written to `%LOCALAPPDATA%\DragShift\log.txt` on Windows, `~/Library/Logs/DragShift/log.txt` on Mac and `~/.local/share/DragShift/log.txt` on Linux.
-
-Windows builds will be code-signed by the SignPath Foundation, which provides free code signing for open-source projects.
+MIT — 원본 저작권은 [LICENSE](LICENSE)에 그대로 있어요. 원본 README는 [docs/README-original.md](docs/README-original.md)에 있어요.

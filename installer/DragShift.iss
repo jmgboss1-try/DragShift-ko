@@ -1,4 +1,4 @@
-; Inno Setup script — per-user install, no admin rights needed.
+﻿; Inno Setup script — per-user install, no admin rights needed.
 #define AppVersion GetEnv("DS_VERSION")
 #if AppVersion == ""
   #define AppVersion "1.1.0"
@@ -6,7 +6,7 @@
 
 [Setup]
 AppId={{6C1E2B0A-7D5F-4E8B-9F3A-D7A5F1C2B3E4}
-AppName=DragShift
+AppName=DragShift 한글판
 AppVersion={#AppVersion}
 AppPublisher=DragShift
 DefaultDirName={localappdata}\Programs\DragShift
@@ -23,10 +23,17 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 
+[Languages]
+#if FileExists(AddBackslash(CompilerPath) + "Languages\Korean.isl")
+Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
+#else
+Name: "korean"; MessagesFile: "Korean.isl"
+#endif
+
 [Tasks]
-Name: "autostart"; Description: "Start DragShift when I sign in to Windows"; Flags: checkedonce
-Name: "contextmenu"; Description: "Add ""DragShift"" to the right-click menu for files"; Flags: checkedonce
-Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
+Name: "autostart"; Description: "윈도우에 로그인할 때 DragShift 자동 실행"; Flags: checkedonce
+Name: "contextmenu"; Description: "파일 우클릭 메뉴에 ""DragShift"" 추가"; Flags: checkedonce
+Name: "desktopicon"; Description: "바탕화면에 바로가기 만들기"; Flags: unchecked
 
 [Files]
 Source: "..\dist\DragShift\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -45,7 +52,7 @@ Root: HKCU; Subkey: "Software\Classes\*\shell\DragShift\command"; ValueType: str
 Root: HKCU; Subkey: "Software\DragShift"; Flags: uninsdeletekey
 
 [Run]
-Filename: "{app}\DragShift.exe"; Description: "Launch DragShift now"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\DragShift.exe"; Description: "지금 DragShift 실행"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/C taskkill /F /IM DragShift.exe"; Flags: runhidden; RunOnceId: "KillDragShift"

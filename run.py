@@ -6,5 +6,7 @@ from dragshift.handoff import try_handoff
 if __name__ == "__main__":
     if try_handoff(sys.argv):
         sys.exit(0)
+    from dragshift import ko  # 한글 패치
+    ko.boot()
     from dragshift.app import main
     sys.exit(main())

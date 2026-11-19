@@ -124,6 +124,9 @@ def summarize(action: str, srcs: list, outs: list, extra: str = "") -> Result:
         return Result("Metadata removed", f"{extra} · {o0.name}" if extra else o0.name, outs, srcs,
                       good="private copy")
 
+    if name == "OCR":
+        return Result("Text recognised", " · ".join(o.name for o in outs), outs, srcs, good="searchable")
+
     if name == "Split":
         return Result(f"Split into {len(outs)} PDFs", f"{o0.name} …", outs, srcs)
 

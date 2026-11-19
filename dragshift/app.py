@@ -14,6 +14,7 @@ from PySide6.QtGui import (QAction, QColor, QCursor, QDesktopServices, QGuiAppli
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QSystemTrayIcon, QWidget
 
+from . import ocr
 from . import __version__, convert, glass, imaging, report, tools
 from .radial import Item, RadialMenu
 from .settings import Settings, SettingsWindow, WelcomeWindow, TRIGGERS
@@ -31,19 +32,19 @@ IPC_NAME = ipc_name()
 
 GLYPHS = {"Compress": "⇲", "Metadata": "ⓘ", "Redact": "▮", "Crop": "⌗", "Edit": "☼",
           "Annotate": "✎", "Add BG": "▣", "Resize": "⤢", "Split": "✂", "Rotate": "⟳",
-          "Merge": "⧉", "Protect": "⚿", "Extract": "⧈"}
+          "Merge": "⧉", "Protect": "⚿", "Extract": "⧈", "OCR": "⌕"}
 
 HINTS = {
     "Compress": "Shrink file size", "Metadata": "View · remove GPS", "Redact": "Hide private info",
     "Crop": "Trim to a ratio", "Edit": "Light · colour · rotate", "Annotate": "Arrows · text · steps",
     "Add BG": "Gradient backdrop", "Resize": "Change dimensions", "Split": "One PDF per page",
     "Rotate": "Turn pages 90°", "Merge": "Join into one PDF", "Protect": "Add a password",
-    "Extract": "Save embedded images",
+    "Extract": "Save embedded images", "OCR": "Scan → searchable text",
 }
 FORMAT_HINTS = {"JPG": "Small, universal", "PNG": "Lossless · transparency", "WEBP": "Smallest for web",
                 "HEIC": "iPhone format", "TIFF": "Print · archival", "AVIF": "Next-gen, tiny",
                 "BMP": "Uncompressed", "PDF": "Document", "ICO": "Windows icon", "GIF": "Legacy web",
-                "DOCX": "Editable Word", "TXT": "Plain text"}
+                "DOCX": "Editable Word", "PPTX": "Slides · exact look", "PPTX ✎": "Slides · editable text", "TXT": "Plain text"}
 
 IMAGE_TOOLS = ["Compress", "Resize", "Crop", "Edit", "Annotate", "Redact", "Add BG", "Metadata"]
 PDF_TOOLS = ["Compress", "Split", "Rotate", "Protect", "Extract", "Metadata"]
@@ -246,10 +247,11 @@ class DragShiftApp(QObject):
                 hint = f"{len(same)} images → 1 PDF"
             convert_items.append(Item(t, key=f"convert:{t}", hint=hint))
         rings: dict[str, list[Item]] = {"Convert": convert_items}
+        extra_tools = ["OCR"] if ocr.available() else []
         if cat == "image":
-            rings["Tools"] = [Item(n, GLYPHS[n], key=f"tool:{n}", hint=HINTS[n]) for n in IMAGE_TOOLS]
+            rings["Tools"] = [Item(n, GLYPHS[n], key=f"tool:{n}", hint=HINTS[n]) for n in IMAGE_TOOLS + extra_tools]
         elif cat == "pdf":
-            names = PDF_TOOLS[:3] + (["Merge"] if len(same) > 1 else []) + PDF_TOOLS[3:]
+            names = PDF_TOOLS[:3] + (["Merge"] if len(same) > 1 else []) + PDF_TOOLS[3:] + extra_tools
             rings["Tools"] = [Item(n, GLYPHS[n], key=f"tool:{n}", hint=HINTS[n]) for n in names]
         return rings
 
@@ -266,6 +268,10 @@ class DragShiftApp(QObject):
                 verb = f"Converting to {name}…"
                 self.submit(f"convert:{name}", paths,
                             lambda: [o for p in paths for o in convert.convert(p, cat, name)], verb)
+            return
+        if name == "OCR":
+            fn = ocr.ocr_pdf if cat == "pdf" else ocr.ocr_image
+            self.submit("tool:OCR", paths, lambda: [o for p in paths for o in fn(p)], "Recognising text…")
             return
         if cat == "pdf":
             if name == "Merge":
@@ -494,6 +500,34 @@ def check_text_renders():
             raise RuntimeError(f"text does not render with font {ui_family(display)!r}")
 
 
+def ocr_selftest():
+    """OCR on a rendered line of text. Required only when DRAGSHIFT_REQUIRE_OCR=1 (CI on Windows)."""
+    required = os.environ.get("DRAGSHIFT_REQUIRE_OCR") == "1"
+    if not ocr.available():
+        print("OCR: not available on this computer")
+        if required:
+            raise RuntimeError("OCR engine not available")
+        return
+    from PIL import Image, ImageDraw, ImageFont
+    font = None
+    for f in ("C:/Windows/Fonts/arial.ttf", "/System/Library/Fonts/Helvetica.ttc",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
+        try:
+            font = ImageFont.truetype(f, 64)
+            break
+        except OSError:
+            pass
+    im = Image.new("RGB", (1400, 200), "white")
+    ImageDraw.Draw(im).text((40, 50), "DragShift OCR check 2026", fill="black", font=font or ImageFont.load_default())
+    try:
+        text = " ".join(l.text for l in ocr.recognize(im))
+    except Exception as e:  # noqa: BLE001
+        text = f"error: {e}"
+    print(f"OCR: {text!r}")
+    if required and "OCR" not in text.upper():
+        raise RuntimeError(f"OCR check failed: {text!r}")
+
+
 def selftest() -> int:
     """Used by CI on the frozen .exe: exercise every library and build the UI, then exit."""
     import tempfile
@@ -525,6 +559,7 @@ def selftest() -> int:
                 w.close()
             ToastStack().info("ok", "ok").dismiss()
             check_text_renders()
+            ocr_selftest()
         print("SELFTEST OK")
         return 0
     except Exception:

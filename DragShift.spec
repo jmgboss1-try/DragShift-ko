@@ -1,15 +1,21 @@
 # PyInstaller spec. ONEFILE=1 -> portable single exe; otherwise a folder for the installer.
 import os
+import sys
 from PyInstaller.utils.hooks import collect_all
 
 onefile = os.environ.get("ONEFILE") == "1"
 heif_datas, heif_bins, heif_hidden = collect_all("pillow_heif")
+pptx_datas, _pptx_bins, pptx_hidden = collect_all("pptx")      # python-pptx ships its default template
+winrt_datas, winrt_bins, winrt_hidden = collect_all("winrt") if sys.platform == "win32" else ([], [], [])
 
 a = Analysis(
     ["run.py"],
-    datas=[("dragshift/assets", "dragshift/assets")] + heif_datas,
-    binaries=heif_bins,
-    hiddenimports=["win32com.client", "PySide6.QtNetwork", "AppKit", "Quartz", "objc"] + heif_hidden,
+    datas=[("dragshift/assets", "dragshift/assets")] + heif_datas + pptx_datas + winrt_datas,
+    binaries=heif_bins + winrt_bins,
+    hiddenimports=["win32com.client", "PySide6.QtNetwork", "AppKit", "Quartz", "objc", "Vision", "Foundation",
+                   "pptx", "winrt.runtime", "winrt.windows.foundation", "winrt.windows.foundation.collections",
+                   "winrt.windows.globalization", "winrt.windows.graphics.imaging", "winrt.windows.media.ocr",
+                   "winrt.windows.storage", "winrt.windows.storage.streams"] + heif_hidden + pptx_hidden + winrt_hidden,
     excludes=["tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtQml",
               "PySide6.QtQuick", "PySide6.Qt3DCore", "PySide6.QtMultimedia", "PySide6.QtCharts",
               "PySide6.QtDataVisualization", "PySide6.QtPdf", "pandas", "yaml", "PySide6.QtSql", "PySide6.QtTest",
